@@ -1,0 +1,8 @@
+/logs
+/evaluation_results
+/长文本文件
+/result
+*.pyc
+__pycache__/
+*.py[cod]
+
