@@ -132,27 +132,45 @@ class AIEvaluator:
         Logger.log_model_io(self.logger, prompt, response)
         return response
 
-    async def _evaluate_coherence(self, section: Dict[str, Any]) -> Dict[str, Any]:
+    async def _evaluate_coherence(self, content: Dict[str, Any]) -> Dict[str, Any]:
         coherence_scores = []
-        paragraphs = section['paragraphs']
-        titles = section.get('titles', [])
         
-        async for i in tqdm_asyncio(range(len(paragraphs) - 1), desc="评估逻辑连贯性", leave=False):
-            if i < len(titles) - 1 and titles[i] == titles[i+1]:
-                prompt = self._create_coherence_prompt(paragraphs[i], paragraphs[i+1])
-                response = await self._get_model_response(prompt)
-                score, explanation = await self._parse_model_response(response)
-                coherence_scores.append({"score": score, "explanation": explanation})
+        # 评估主要段落之间的连贯性
+        main_paragraphs = content['paragraphs']
+        for i in range(len(main_paragraphs) - 1):
+            prompt = self._create_coherence_prompt(main_paragraphs[i], main_paragraphs[i+1])
+            response = await self._get_model_response(prompt)
+            score, explanation = await self._parse_model_response(response)
+            coherence_scores.append({
+                "type": "main",
+                "score": score,
+                "explanation": explanation
+            })
+        
+        # 评估子章节内部的连贯性
+        if 'subsections' in content:
+            for subsection in content['subsections']:
+                sub_paragraphs = subsection['paragraphs']
+                for i in range(len(sub_paragraphs) - 1):
+                    prompt = self._create_coherence_prompt(sub_paragraphs[i], sub_paragraphs[i+1])
+                    response = await self._get_model_response(prompt)
+                    score, explanation = await self._parse_model_response(response)
+                    coherence_scores.append({
+                        "type": "subsection",
+                        "title": subsection['title'],
+                        "score": score,
+                        "explanation": explanation
+                    })
         
         if not coherence_scores:
             return {
                 "overall_score": None,
-                "overall_explanation": "该章节只包含一个段落或所有段落属于不同标题，无法评估连贯性。",
+                "overall_explanation": "文章结构不足以评估连贯性。",
                 "coherence_scores": []
             }
         
         overall_score = round(sum(item['score'] for item in coherence_scores) / len(coherence_scores), 1)
-        overall_explanation = f"段落间连贯性评分: {', '.join([str(item['score']) for item in coherence_scores])}。整体评分为各评分的平均值。"
+        overall_explanation = f"总共评估了 {len(coherence_scores)} 对段落的连贯性。整体评分为各评分的平均值。"
         
         return {
             "overall_score": overall_score,
@@ -423,32 +441,42 @@ if __name__ == "__main__":
     expected_style = "专业、客观，使用医学和技术术语，但同时保持通俗易懂。语调应该是信息性的，带有一定的乐观态度，但也要客观指出潜在的问题和挑战。"
     evaluator = AIEvaluator(api_key, topic, topic_description, expected_style)
 
-    # 假设我们已经从 files.py 获得了处理后的 sections
-    from files import TextProcessor
-    input_file = r"长文本文件\a.txt"
-    text_processor = TextProcessor(input_file)
-    sections = text_processor.process()
+    async def test_coherence():
+        # 创建一个测试用的 section
+        test_section = {
+            "title": "AI在医疗诊断中的应用",
+    "paragraphs": [
+        "人工智能在医疗诊断中的应用正在迅速发展。机器学习算法可以分析大量的医疗影像，如X光片、CT扫描和MRI图像，帮助医生更快速、更准确地识别疾病。",
+        "例如，在放射学领域，AI系统已经能够以与人类专家相当甚至更高的准确率检测出肺癌和乳腺癌。这不仅提高了诊断的效率，还能减少人为错误，特别是在资源有限的地区。",
+        "然而，尽管AI在医疗诊断中展现出巨大潜力，但它也面临着一些挑战。数据隐私和安全是一个主要问题，因为AI系统需要访问大量敏感的患者数据。"
+    ],
+    "subsections": [
+        {
+            "title": "AI在医疗诊断中的优势",
+            "paragraphs": [
+                "AI在医疗诊断中的优势在于其能够处理大量数据，并从中提取有价值的信息。机器学习算法可以分析大量的医疗影像，如X光片、CT扫描和MRI图像，帮助医生更快速、更准确地识别疾病。",
+                "例如，在放射学领域，AI系统已经能够以与人类专家相当甚至更高的准确率检测出肺癌和乳腺癌。这不仅提高了诊断的效率，还能减少人为错误，特别是在资源有限的地区。"
+            ],
+            }
+        ],  
+        }
 
-    async def main():
-        evaluated_sections = await evaluator.evaluate_document(sections)
+        # 评估连贯性
+        coherence_result = await evaluator._evaluate_coherence(test_section)
 
-        # 保存最终评估结果
-        evaluator.save_results(evaluated_sections, input_file)
-
-        # 打印评估结果
-        for section in evaluated_sections:
-            print(f"标题: {section['title']}")
-            print("评分:")
-            for criterion, result in section['scores'].items():
-                print(f"  {criterion}:")
-                if isinstance(result, dict) and 'score' in result and 'explanation' in result:
-                    print(f"    分数: {result['score']}")
-                    print(f"    解释: {result['explanation']}")
-                else:
-                    print(f"    结果格式不正确: {result}")
+        # 打印结果
+        print("连贯性评估结果:")
+        print(f"整体分数: {coherence_result['overall_score']}")
+        print(f"整体解释: {coherence_result['overall_explanation']}")
+        print("\n段落间连贯性评分:")
+        for i, score in enumerate(coherence_result['coherence_scores']):
+            print(f"段落 {i+1} 和 {i+2}:")
+            print(f"  分数: {score['score']}")
+            print(f"  解释: {score['explanation']}")
             print()
 
     if sys.platform.startswith('win'):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    asyncio.run(main())
+    asyncio.run(test_coherence())
+
