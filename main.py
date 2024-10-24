@@ -6,12 +6,17 @@ from datetime import datetime
 from evaluate import AIEvaluator
 from analysis import ResultAnalyzer
 from files import TextProcessor
+from model.siliconflow_model import SiliconFlowModel
 
 def load_dataset(json_file):
     with open(json_file, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-async def process_item(item_key, item_data, api_key):
+def load_config():
+    with open('config.json', 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+async def process_item(item_key, item_data, config):
     topic = item_data['topic']
     file_path = item_data['file_path']
     description = item_data['description']
@@ -20,9 +25,16 @@ async def process_item(item_key, item_data, api_key):
     text_processor = TextProcessor(file_path)
     processed_sections = text_processor.process()
     
+    # 创建模型实例
+    model = SiliconFlowModel(
+        api_key=config['siliconflow']['api_key'],
+        model=config['siliconflow'].get('model'),
+        base_url=config['siliconflow'].get('base_url')
+    )
+
     # 创建评估器
     expected_style = "遵循特定人工智能领域的规范，保持准确性、客观性、一致性和清晰性，具备良好的组织结构，并在写作前深入思考核心内容和表达方式。"
-    evaluator = AIEvaluator(api_key=api_key, topic=topic, topic_description=description, expected_style=expected_style)
+    evaluator = AIEvaluator(model=model, topic=topic, topic_description=description, expected_style=expected_style)
     
     # 进行评估
     evaluated_sections = await evaluator.evaluate_document(processed_sections)
@@ -46,16 +58,17 @@ async def process_item(item_key, item_data, api_key):
     print("--------------------")
 
 async def main():
+    # 加载配置
+    config = load_config()
+    
     # 加载数据集
     dataset = load_dataset('dataset.json')
     
     # 创建评估结果文件夹
     os.makedirs('evaluation_results', exist_ok=True)
-
-    api_key = "sk-asjddhdkjjbpnknahupsoqnrvjoyhgpefcnqzjvgyrufgczl"  # 请替换为您的实际 API 密钥
     
     # 对每个项目进行评估和分析
-    tasks = [process_item(item_key, item_data, api_key) for item_key, item_data in dataset.items()]
+    tasks = [process_item(item_key, item_data, config) for item_key, item_data in dataset.items()]
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":

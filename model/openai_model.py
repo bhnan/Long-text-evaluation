@@ -4,6 +4,7 @@ from .base_model import BaseModel
 import traceback
 import aiohttp
 import sys
+import json
 
 class OpenAIModel(BaseModel):
     def __init__(self, api_key, model=None, base_url=None):
@@ -39,7 +40,19 @@ class OpenAIModel(BaseModel):
 
 if __name__ == "__main__":
     async def main():
-        model = OpenAIModel(api_key="hk-wzt14610000041763a42b12fc87f7a4e290a9d07325a91e7", model="gpt-3.5-turbo", base_url="https://api.openai-hk.com/v1")
+        # 从 config.json 文件中读取配置
+        with open('config.json', 'r') as config_file:
+            config = json.load(config_file)
+        
+        # 获取 OpenAI 配置
+        openai_config = config['openai']
+        
+        model = OpenAIModel(
+            api_key=openai_config['api_key'],
+            model=openai_config['model'],
+            base_url=openai_config['base_url']
+        )
+        
         response = await model.get_response("你好")
         print(response)
 

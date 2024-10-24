@@ -12,8 +12,8 @@ from checkpoint import CheckpointManager
 from myparser import ResponseParser
 
 class AIEvaluator:
-    def __init__(self, api_key, topic, topic_description, expected_style):
-        self.model = SiliconFlowModel(api_key)
+    def __init__(self, model, topic, topic_description, expected_style):
+        self.model = model
         self.criteria = [
             "内容准确性和相关性",
             "逻辑连贯性和结构",
@@ -70,7 +70,7 @@ class AIEvaluator:
         for criterion in self.criteria:
             if criterion == "内容准确性和相关性":
                 scores[criterion] = await self._evaluate_accuracy_relevance(section)
-            elif criterion == "逻辑连贯性和结构":
+            elif criterion == "逻连贯性和结构":
                 scores[criterion] = await self._evaluate_coherence(section)
             elif criterion == "语言流畅度和表达":
                 scores[criterion] = await self._evaluate_fluency(section)
@@ -441,42 +441,31 @@ if __name__ == "__main__":
     expected_style = "专业、客观，使用医学和技术术语，但同时保持通俗易懂。语调应该是信息性的，带有一定的乐观态度，但也要客观指出潜在的问题和挑战。"
     evaluator = AIEvaluator(api_key, topic, topic_description, expected_style)
 
-    async def test_coherence():
-        # 创建一个测试用的 section
-        test_section = {
-            "title": "AI在医疗诊断中的应用",
-    "paragraphs": [
-        "人工智能在医疗诊断中的应用正在迅速发展。机器学习算法可以分析大量的医疗影像，如X光片、CT扫描和MRI图像，帮助医生更快速、更准确地识别疾病。",
-        "例如，在放射学领域，AI系统已经能够以与人类专家相当甚至更高的准确率检测出肺癌和乳腺癌。这不仅提高了诊断的效率，还能减少人为错误，特别是在资源有限的地区。",
-        "然而，尽管AI在医疗诊断中展现出巨大潜力，但它也面临着一些挑战。数据隐私和安全是一个主要问题，因为AI系统需要访问大量敏感的患者数据。"
-    ],
-    "subsections": [
-        {
-            "title": "AI在医疗诊断中的优势",
-            "paragraphs": [
-                "AI在医疗诊断中的优势在于其能够处理大量数据，并从中提取有价值的信息。机器学习算法可以分析大量的医疗影像，如X光片、CT扫描和MRI图像，帮助医生更快速、更准确地识别疾病。",
-                "例如，在放射学领域，AI系统已经能够以与人类专家相当甚至更高的准确率检测出肺癌和乳腺癌。这不仅提高了诊断的效率，还能减少人为错误，特别是在资源有限的地区。"
-            ],
-            }
-        ],  
-        }
+    # 假设我们已经从 files.py 获得了处理后的 sections
+    from files import TextProcessor
+    input_file = r"长文本文件\a.txt"
+    text_processor = TextProcessor(input_file)
+    sections = text_processor.process()
 
-        # 评估连贯性
-        coherence_result = await evaluator._evaluate_coherence(test_section)
-
-        # 打印结果
-        print("连贯性评估结果:")
-        print(f"整体分数: {coherence_result['overall_score']}")
-        print(f"整体解释: {coherence_result['overall_explanation']}")
-        print("\n段落间连贯性评分:")
-        for i, score in enumerate(coherence_result['coherence_scores']):
-            print(f"段落 {i+1} 和 {i+2}:")
-            print(f"  分数: {score['score']}")
-            print(f"  解释: {score['explanation']}")
-            print()
+    async def main():
+        for section in sections:
+            print(f"标题: {section['title']}")
+            print("段落:")
+            for i, paragraph in enumerate(section['paragraphs'], 1):
+                print(f"  段落 {i}: {paragraph[:50]}...")  # 只显示每个段落的前50个字符
+            print("\n连贯性评分:")
+            
+            coherence_result = await evaluator._evaluate_coherence(section)
+            print(f"  整体分数: {coherence_result['overall_score']}")
+            print(f"  整体解释: {coherence_result['overall_explanation']}")
+            print("  段落间连贯性评分:")
+            for i, score in enumerate(coherence_result['coherence_scores'], 1):
+                print(f"    段落 {i} 和 {i+1} 之间:")
+                print(f"      分数: {score['score']}")
+                print(f"      解释: {score['explanation']}")
+            print("\n" + "="*50 + "\n")
 
     if sys.platform.startswith('win'):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    asyncio.run(test_coherence())
-
+    asyncio.run(main())

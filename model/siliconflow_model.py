@@ -4,6 +4,7 @@ import asyncio
 import sys
 import time
 import tiktoken
+import json
 
 class RateLimiter:
     def __init__(self, rpm, tpm):
@@ -73,17 +74,29 @@ class SiliconFlowModel(BaseModel):
             return None
 
 if __name__ == "__main__":
-    model = SiliconFlowModel(api_key="sk-asjddhdkjjbpnknahupsoqnrvjoyhgpefcnqzjvgyrufgczl")
-    
-    async def test():
+    async def main():
+        # 从 config.json 文件中读取配置
+        with open('config.json', 'r', encoding='utf-8') as config_file:
+            config = json.load(config_file)
+        
+        # 获取 SiliconFlow 配置
+        siliconflow_config = config['siliconflow']
+        
+        model = SiliconFlowModel(
+            api_key=siliconflow_config['api_key'],
+            model=siliconflow_config.get('model'),  # 使用 get 方法,如果 'model' 键不存在则返回 None
+            base_url=siliconflow_config.get('base_url')  # 同上
+        )
+        
         response = await model.get_response("你好")
         print(response)
-    
+
     if sys.platform.startswith('win'):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
+
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(test())
+        loop.run_until_complete(main())
     finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
