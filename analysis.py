@@ -116,7 +116,70 @@ class ResultAnalyzer:
         self.generate_summary_report()
         print(f"Analysis completed. Charts and summary report have been saved in the '{self.result_folder}' folder.")
 
+    @staticmethod
+    def plot_comparison_radar(file_path1: str, file_path2: str):
+        """比较两个评估结果的雷达图"""
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+        plt.rcParams['axes.unicode_minus'] = False    # 用来正常显示负号
+        
+        analyzer1 = ResultAnalyzer(file_path1)
+        analyzer2 = ResultAnalyzer(file_path2)
+        
+        scores1 = analyzer1.calculate_average_scores()
+        scores2 = analyzer2.calculate_average_scores()
+        
+        # 设置雷达图的角度
+        categories = list(scores1.keys())
+        num_vars = len(categories)
+        angles = [n / float(num_vars) * 2 * np.pi for n in range(num_vars)]
+        angles += angles[:1]
+        
+        # 设置图形
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
+        
+        # 获取数据
+        values1 = list(scores1.values())
+        values2 = list(scores2.values())
+        values1 += values1[:1]
+        values2 += values2[:1]
+        angles = np.array(angles)
+        
+        # 解析文件名获取研究方案名称
+        def get_study_name(file_path):
+            file_name = os.path.basename(file_path)
+            # 移除 'evaluation_' 前缀和 '.json' 后缀
+            name = file_name.replace('evaluation_', '').replace('.json', '')
+            # 移除末尾的时间戳部分 (_YYYYMMDD_HHMMSS)
+            return '_'.join(name.split('_')[:-2])
+        
+        # 绘制雷达图
+        ax.plot(angles, values1, 'o-', linewidth=2, label=get_study_name(file_path1))
+        ax.fill(angles, values1, alpha=0.25)
+        ax.plot(angles, values2, 'o-', linewidth=2, label=get_study_name(file_path2))
+        ax.fill(angles, values2, alpha=0.25)
+        
+        # 调整图例位置和大小
+        plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=8)
+        
+        # 调整图形大小以适应长标签
+        fig.set_size_inches(12, 8)
+        plt.tight_layout()  # 自动调整布局
+        
+        result_folder = "result/comparison"
+        os.makedirs(result_folder, exist_ok=True)
+        plt.savefig(f'{result_folder}/radar_comparison.png')
+        plt.close()
+        
+        print(f"Radar comparison chart has been saved in the '{result_folder}' folder.")
+
 # Usage example
 if __name__ == "__main__":
-    analyzer = ResultAnalyzer("evaluation_results/evaluation_a_20241022_170501.json")
+    analyzer = ResultAnalyzer("evaluation_results/evaluation_知识图谱增强的LLM多智能体决策方案_20241103_173857.json")
     analyzer.analyze()
+    
+    # 比较两个文件
+    ResultAnalyzer.plot_comparison_radar(
+        "evaluation_results\evaluation_知识图谱增强的LLM多智能体决策方案_20241103_173857.json",
+        "evaluation_results\evaluation_知识图谱增强的LLM多智能体决策方案_橙篇_20241103_180851.json"
+    )

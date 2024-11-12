@@ -135,6 +135,14 @@ class AIEvaluator:
     async def _evaluate_coherence(self, content: Dict[str, Any]) -> Dict[str, Any]:
         coherence_scores = []
         
+        # 计算总评估次数
+        total_evaluations = len(content['paragraphs']) - 1
+        if 'subsections' in content:
+            total_evaluations += sum(len(subsection['paragraphs']) - 1 for subsection in content['subsections'])
+        
+        # 创建进度条
+        pbar = tqdm_asyncio(total=total_evaluations, desc="评估连贯性")
+        
         # 评估主要段落之间的连贯性
         main_paragraphs = content['paragraphs']
         for i in range(len(main_paragraphs) - 1):
@@ -146,6 +154,7 @@ class AIEvaluator:
                 "score": score,
                 "explanation": explanation
             })
+            pbar.update(1)
         
         # 评估子章节内部的连贯性
         if 'subsections' in content:
@@ -161,6 +170,10 @@ class AIEvaluator:
                         "score": score,
                         "explanation": explanation
                     })
+                    pbar.update(1)
+        
+        # 关闭进度条
+        pbar.close()
         
         if not coherence_scores:
             return {
@@ -439,11 +452,15 @@ if __name__ == "__main__":
     topic = "人工智能在医疗领域的应用"
     topic_description = "探讨人工智能技术如何在诊断、治疗和医疗管理中的应用，以及其带来的机遇和挑战。"
     expected_style = "专业、客观，使用医学和技术术语，但同时保持通俗易懂。语调应该是信息性的，带有一定的乐观态度，但也要客观指出潜在的问题和挑战。"
-    evaluator = AIEvaluator(api_key, topic, topic_description, expected_style)
+
+    model = SiliconFlowModel(
+            api_key=api_key,
+        )
+    evaluator = AIEvaluator(model, topic, topic_description, expected_style)
 
     # 假设我们已经从 files.py 获得了处理后的 sections
     from files import TextProcessor
-    input_file = r"长文本文件\a.txt"
+    input_file = r"长文本文件\知识图谱增强的LLM多智能体决策方案.txt"
     text_processor = TextProcessor(input_file)
     sections = text_processor.process()
 
@@ -469,3 +486,4 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     asyncio.run(main())
+
